@@ -38,6 +38,15 @@ class MesonToolchain(object):
     {{it}} = {{value}}
     {% endfor %}
 
+    {% for subproject, listkeypair in subproject_options -%}
+    [{{subproject}}:project options]
+    {% for keypair in listkeypair -%}
+    {% for it, value in keypair.items() -%}
+    {{it}} = {{value}}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+
     [binaries]
     {% if c %}c = '{{c}}'{% endif %}
     {% if cpp %}cpp = '{{cpp}}'{% endif %}
@@ -131,6 +140,8 @@ class MesonToolchain(object):
         }
         # Add all the default dirs
         self.project_options.update(self._get_default_dirs())
+
+        self.subproject_options = {}
 
         self.preprocessor_definitions = {}
         self.pkg_config_path = self._conanfile.generators_folder
@@ -329,11 +340,19 @@ class MesonToolchain(object):
         if self.gcc_cxx11_abi:
             self.cpp_args.append("-D{}".format(self.gcc_cxx11_abi))
 
+        subproject_options = {}
+        for subproject, listkeypair in self.subproject_options.items():
+            if listkeypair is not None and listkeypair is not []:
+                subproject_options[subproject] = []
+                for keypair in listkeypair:
+                    subproject_options[subproject].append({k: to_meson_value(v) for k, v in keypair.items()})
+
         return {
             # https://mesonbuild.com/Machine-files.html#properties
             "properties": {k: to_meson_value(v) for k, v in self.properties.items()},
             # https://mesonbuild.com/Machine-files.html#project-specific-options
             "project_options": {k: to_meson_value(v) for k, v in self.project_options.items()},
+            "subproject_options": subproject_options.items(),
             # https://mesonbuild.com/Builtin-options.html#directories
             # TODO : we don't manage paths like libdir here (yet?)
             # https://mesonbuild.com/Machine-files.html#binaries

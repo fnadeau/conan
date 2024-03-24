@@ -141,3 +141,42 @@ def test_correct_quotes():
     assert "cpp_std = 'c++17'" in content
     assert "backend = 'ninja'" in content
     assert "buildtype = 'release'" in content
+
+def test_subproject_options():
+    profile = textwrap.dedent("""
+    [settings]
+    os=Linux
+    arch=x86_64
+    compiler=gcc
+    compiler.version=13.2
+    compiler.libcxx=libstdc++
+    build_type=Release
+    """)
+
+    _conanfile_py = textwrap.dedent("""
+    from conan import ConanFile
+    from conan.tools.meson import MesonToolchain
+
+    class App(ConanFile):
+        settings = "os", "arch", "compiler", "build_type"
+
+        def generate(self):
+            tc = MesonToolchain(self)
+            tc.subproject_options["subproject1"] = [{"option1": "enabled"}, {"option2": "disabled"}]
+            tc.subproject_options["subproject2"] = [{"option3": "enabled"}]
+            tc.subproject_options["subproject2"].append({"option4": "disabled"})
+            tc.generate()
+    """)
+
+    t = TestClient()
+    t.save({"conanfile.py": _conanfile_py,
+            "profile": profile,})
+
+    t.run("install . -pr=profile")
+    content = t.load(MesonToolchain.native_filename)
+    assert "[subproject1:project options]" in content
+    assert "[subproject2:project options]" in content
+    assert "option1 = 'enabled'" in content
+    assert "option2 = 'disabled'" in content
+    assert "option3 = 'enabled'" in content
+    assert "option4 = 'disabled'" in content
